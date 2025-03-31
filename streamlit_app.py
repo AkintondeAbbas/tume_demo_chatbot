@@ -1,68 +1,110 @@
 import streamlit as st
 from openai import OpenAI
 from PIL import Image
+import base64
 
-#image = Image.open("tume_logo.png")
-#resized_image = image.resize((300, 200))
-st.sidebar.image("tume_logo.png")
+#st.sidebar.image("tume_logo.png",width=300)
+
+if "page" not in st.session_state:
+    st.session_state.page = None
+
+# Load and encode your image
+with open("tume_logo.png", "rb") as img_file:
+    encoded = base64.b64encode(img_file.read()).decode()
+
+# Create the clickable image with rounded corners
+sidebar_html = f"""
+<a href="https://tume.ai" target="_blank">
+    <img src="data:image/png;base64,{encoded}" 
+         width="280" 
+         style="border-radius: 10px; display: block; margin: auto;">
+</a>
+"""
+
+# Show in the sidebar
+st.sidebar.markdown(sidebar_html, unsafe_allow_html=True)
 
 with st.sidebar:
-    #openai_api_key = st.text_input("OpenAI API Key", key="chatbot_api_key", type="password")
-    "[Checkout other agents here](https://www.tume.ai/demo-v2)"
-    #"[View the source code](https://github.com/streamlit/llm-examples/blob/main/Chatbot.py)"
-    #"[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/streamlit/llm-examples?quickstart=1)"
+    st.write("")
+
+    st.title("Use cases")
+
+    st.write("")
+
+    button_col1, text_col1 = st.sidebar.columns([1, 4])
+
+    with text_col1:
+        st.write("Explore US electricity markets data")
+    with button_col1:
+        if st.button("➔ ", key='markets'):
+            st.session_state.page = "markets"
+
+    button_col2, text_col2  = st.sidebar.columns([1, 4])
+
+    with text_col2:
+        st.write("Perform battery energy storage revenue analysis")
+    with button_col2:
+        if st.button("➔ ", key='batteries'):
+            st.session_state.page = "batteries"
+
+    button_col3, text_col3  = st.sidebar.columns([1, 4])
+    with text_col3:
+        st.write("Get your customized briefs on energy market trends")
+    with button_col3:
+        if st.button("➔ ", key='briefs'):
+            st.session_state.page = "briefs"
+
+    button_col4, text_col4  = st.sidebar.columns([1, 4])
+    with text_col4:
+        st.write("Back to home")
+    with button_col4:
+        if st.button("🏠", key='home'):
+            st.session_state.page = None
+        
+    st.write("")
+    "[Tume AI blog - learn more about the exciting things we are building for you and other great energy markets insights!](https://www.tume.ai)"
 
 
-# Show title and description.
-st.title("Energy Markets Data Explorer")
-st.write(
-    "Hi there! I currently have access to electricity markets data for all ISOs in the US. Let me know what you're looking for and I'll be happy to help out. "
-    #"To use this app, you need to provide an OpenAI API key, which you can get [here](https://platform.openai.com/account/api-keys). "
-    #"You can also learn how to build this app step by step by [following our tutorial](https://docs.streamlit.io/develop/tutorials/llms/build-conversational-apps)."
-)
+if st.session_state.page is None:
+    # Show the default "chat-style" welcome screen
+    st.title("What can I help with?")
+    st.write("Hi there! Your AI Energy Analyst here 🙂. Here are a couple of things I can do at the moment.")
+    
+    st.write("1. I know a whole lot about market protocols, pricing data, supply and demand patterns for ERCOT, PJM, CAISO and NYISO markets")
+    st.write("2. I also know a lot batteries in ERCOT and can even run optimal battery dispatch models")
+    st.write("3. I can help you evaluate potential returns for battery projects in ERCOT based on whatever assumptions you'd like to make")
+    st.write("4. I'm really good at creating custom briefs to help you stay on top of energy market trends that are most important to you")
+    "[Check out this blog to see new things I'll be able to do](https://www.tume.ai)."
+    st.write("I'm learning everyday so I'll be able to do even more cooler things very soon. If there are specific things you'd like me to know so that I can help you with related tasks, you can reach out to my tutors at tume@tume.ai. Thanks!")
 
-# Ask user for their OpenAI API key via `st.text_input`.
-# Alternatively, you can store the API key in `./.streamlit/secrets.toml` and access it
-# via `st.secrets`, see https://docs.streamlit.io/develop/concepts/connections/secrets-management
-openai_api_key = st.text_input("OpenAI API Key", type="password")
-if not openai_api_key:
-    st.info("Please add your OpenAI API key to continue.", icon="🗝️")
+    
+    user_input = st.chat_input("Type your question here...")
+    if user_input:
+        st.write(f"🤖 You said: {user_input}")
+
 else:
+    # Show content based on what was clicked
+    if st.session_state.page == "markets":
+        st.title("Energy Markets Data Explorer")
+        st.write("I know a whole lot about market protocols, pricing data, supply and demand patterns for ERCOT, PJM, CAISO and NYISO markets. "
+        "Feel free to ask me anything about those markets.")
+        user_input = st.chat_input("Type your question here...")
+        if user_input:
+            st.write(f"🤖 You said: {user_input}")
 
-    # Create an OpenAI client.
-    client = OpenAI(api_key=openai_api_key)
+    elif st.session_state.page == "batteries":
+        st.title("BESS Benchmarks and Returns Analyzer")
+        st.write("I know a whole lot about revenues for actual FTM grid-scale batteries in ERCOT. I can also run optimal revenue analysis and dispatch with only energy"
+        " arbitrage in ERCOT, PJM, NYISO and CAISO. I'll be able to do optimal revenue stacking for both FTM and BTM batteries across regulated and competitive markets very soon. "
+        "Let me know what you need.")
+        user_input = st.chat_input("Type your question here...")
+        if user_input:
+            st.write(f"🤖 You said: {user_input}")
 
-    # Create a session state variable to store the chat messages. This ensures that the
-    # messages persist across reruns.
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-
-    # Display the existing chat messages via `st.chat_message`.
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
-    # Create a chat input field to allow the user to enter a message. This will display
-    # automatically at the bottom of the page.
-    if prompt := st.chat_input("What is up?"):
-
-        # Store and display the current prompt.
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
-        # Generate a response using the OpenAI API.
-        stream = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": m["role"], "content": m["content"]}
-                for m in st.session_state.messages
-            ],
-            stream=True,
-        )
-
-        # Stream the response to the chat using `st.write_stream`, then store it in 
-        # session state.
-        with st.chat_message("assistant"):
-            response = st.write_stream(stream)
-        st.session_state.messages.append({"role": "assistant", "content": response})
+    elif st.session_state.page == "briefs":
+        st.title("Market Trends and Briefs Generator")
+        st.write("Let me know what energy market topics or trends you'd like to keep an eye on and when and how frequently you'd like to get your briefs. "
+        "You'd need a subscription to be able to do this.")
+        user_input = st.chat_input("Type your question here...")
+        if user_input:
+            st.write(f"🤖 You said: {user_input}")
