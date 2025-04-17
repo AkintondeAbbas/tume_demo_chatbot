@@ -1,30 +1,23 @@
 import streamlit as st
 from openai import OpenAI
 from PIL import Image
+import requests
 import base64
-import uuid
-import webbrowser
+import re
+import json
 
 #st.sidebar.image("tume_logo.png",width=300)
 
-user_store = {"akintondeabbas@gmail.com": {
-        "email": "akintondeabbas@gmail.com",
-        "password": "Akin123",
-        "first_name": "Akintonde",
-        "last_name": "Abbas",
-        "subscribed": True
-    },
-    "bob@example.com": {
-        "email": "bob@example.com",
-        "password": "mypassword",
-        "first_name": "Bob",
-        "last_name": "Jones",
-        "subscribed": False
-    }
-    } #database placeholder
 
-STRIPE_CHECKOUT_URL = "https://buy.stripe.com/test_9AQeWD8mw0va4PmaEE"
+# Backend API URL
+#API_URL = "https://5132-2600-8806-350b-a700-c012-7c81-8638-e198.ngrok-free.app"
+signup_url = "https://5132-2600-8806-350b-a700-c012-7c81-8638-e198.ngrok-free.app/api/auth/signup"
+login_url = "https://5132-2600-8806-350b-a700-c012-7c81-8638-e198.ngrok-free.app/api/auth/login"
+checkout_url = "https://5132-2600-8806-350b-a700-c012-7c81-8638-e198.ngrok-free.app/api/payment/create-checkout-session"
+profile_url = "https://5132-2600-8806-350b-a700-c012-7c81-8638-e198.ngrok-free.app/api/user/me"
 
+
+#Initializing state variables
 if "page" not in st.session_state:
     st.session_state.page = None
 
@@ -34,7 +27,22 @@ if "authenticated" not in st.session_state:
 if "subscribed" not in st.session_state:
     st.session_state.subscribed = False
 
-# Load and encode your image
+if "access_token" not in st.session_state:
+    st.session_state.access_token = None
+
+if "session_token" not in st.session_state:
+    st.session_state.session_token = None
+
+# Headers
+headers = {
+    "Authorization": f"Bearer {st.session_state.access_token}",
+    "X-Session-Token": st.session_state.session_token  # if your backend expects it
+}
+headers_login = {
+    "Content-Type": "application/json"
+}
+
+# Load and encode your logo image
 with open("tume_logo.png", "rb") as img_file:
     encoded = base64.b64encode(img_file.read()).decode()
 
@@ -52,9 +60,7 @@ st.sidebar.markdown(sidebar_html, unsafe_allow_html=True)
 
 with st.sidebar:
     st.write("")
-
     st.title("Use cases")
-
     st.write("")
 
     button_col1, text_col1 = st.sidebar.columns([1, 4])
@@ -115,57 +121,85 @@ if st.session_state.page is None:
 
     elif (st.session_state.authenticated == True) & (st.session_state.subscribed == False):
 
-        user_input = st.chat_input("Type your question here...")
-        if user_input:
-            st.write(f"🤖 You said: {user_input}")
-
         st.write("**You are currently signed in with a 5 questions per day limit**")
 
     elif (st.session_state.authenticated == True) & (st.session_state.subscribed == True):
-
-        user_input = st.chat_input("Type your question here...")
-        if user_input:
-            st.write(f"🤖 You said: {user_input}")
 
         st.write("**You are currently signed in and you have full access to my current capabilities!**")
 
     
     st.write("If there are specific things you'd like me to know so that I can help you with related tasks, you can reach out to my tutors at tume@tume.ai. Thanks!")
+    
+    st.write(" ")
 
+    if (st.session_state.authenticated == True):
+        col1, col2 , col3 = st.columns(3)
+        with col1:
+            if st.button("Explore energy markets data"):
+                st.session_state.page = "markets"
+                st.rerun()
+        with col2:
+            if st.button("Analyze BESS project returns"):
+                st.session_state.page = "batteries"
+                st.rerun()
+        with col3:
+            if st.button("Get customized energy briefs"):
+                st.session_state.page = "briefs"
+                st.rerun()
 
+# Flow for login page
 elif st.session_state.page == "auth":
     st.title("🔐 Login or Sign Up")
 
     email = st.text_input("Email")
+    email_processed = email.lower()
     password = st.text_input("Password", type="password")
 
     col1, col2 = st.columns(2)
 
     with col1:
         if st.button("Login"):
-            user = user_store.get(email)
-            if user and user["password"] == password:
-                st.success(f"Welcome back, {user['email']}!")
-                st.session_state.page = None
-                st.session_state.authenticated = True
-                if user['subscribed'] == True:
-                    st.session_state.subscribed = True
-                st.rerun()
-            else:
-                st.error("Invalid credentials. Please try again.")
+            
+            payload = {
+                "username": email_processed,
+                "password": password
+            }
+            
+            #payload = json.loads(json.dumps(payload))
+            try:
+                login_response = requests.post(login_url, json=payload, headers=headers_login)
+
+                if login_response.status_code == 200:
+                    #import pdb
+                    #pdb.set_trace()
+                    st.session_state.access_token = login_response['access_token']
+                    st.session_state.session_token = login_response['session_token']
+                    profile_response = requests.get(profile_url, headers = headers)
+                    st.session_state.page = None
+                    st.session_state.authenticated = True
+                    if profile_response['is_paid_user'] == 'true':
+                        st.session_state.subscribed = True
+                    st.rerun()
+
+                elif login_response.status_code == 500:
+                    st.error(f"Error: {login_response}")
+
+                else:
+                    st.error(f"Error: {login_response.status_code}")
+            except Exception as e:
+                st.error(f"Request failed: {e}")
 
     with col2:
         if st.button("Sign Up"):
             if not email or not password:
                 st.warning("Please enter both email and password.")
-            elif email in user_store:
-                st.warning("User already exists. Try logging in.")
             else:
-                st.session_state.signup_email = email
+                st.session_state.signup_email = email_processed
                 st.session_state.signup_password = password
                 st.session_state.page = "signup_details"
                 st.rerun()
 
+# Flow for signup page
 elif st.session_state.page == "signup_details":
     st.title("📝 Complete Your Sign Up")
 
@@ -181,47 +215,61 @@ elif st.session_state.page == "signup_details":
 
     with col1:
 
-        if st.button("Signup & Subscribe"):
+        if st.button("**Signup & Subscribe**"):
             if not first_name or not last_name:
                 st.warning("Please fill out your full name.")
             else:
-                user_store[email] = {
-                    "email": email,
-                    "password": password,
+                payload = {"email": email,
                     "first_name": first_name,
-                    "last_name": last_name
-                }
-                st.success("Redirecting to Stripe checkout to complete signup and subscription...")
+                    "last_name": last_name,
+                    "password": password}
+                try:
+                    signup_response = requests.post(signup_url, json=payload)
 
-                # Redirect to Stripe
-                js = f"window.open('{STRIPE_CHECKOUT_URL}','_blank').focus();"
-                st.components.v1.html(f"<script>{js}</script>", height=0)
+                    if signup_response.status_code == 200:
+                        st.session_state.access_token = signup_response['access_token']
+                        st.session_state.session_token = signup_response['session_token']
+                        checkout_payload = {"success_url":"https://tume.ai",
+                                           "cancel_url":"https://tume.ai",
+                                           "price_id": "price_1RBnXyQb10U9WeFzRUYDM3Ec"}
 
-                st.markdown("After completing payment, come back and login!")
+                        st.success("Redirecting to Stripe checkout to complete signup and subscription...")
+                        payment_response = requests.post(checkout_url, json=checkout_payload, headers=headers)
+                        st.session_state.page = 'auth'
+                        st.rerun()
+                    else:
+                        st.error(f"Error: {signup_response.status_code}")
+                except Exception as e:
+                    st.error(f"Request failed: {e}")
 
     with col2:
 
-        if st.button("Signup Only"):
+        if st.button("**Signup Only**"):
             if not first_name or not last_name:
                 st.warning("Please fill out your full name.")
             else:
-                user_store[email] = {
-                    "email": email,
-                    "password": password,
+                payload = {"email": email,
                     "first_name": first_name,
-                    "last_name": last_name
-                }
-                st.success("Signup complete!")
-                st.session_state.page = None
-                st.session_state.authenticated = True
-                st.session_state.subscribed = False
-                st.rerun()
+                    "last_name": last_name,
+                    "password": password}
+                try:
+                    signup_response = requests.post(signup_url, json=payload)
+
+                    if signup_response.status_code == 200:
+                        st.success("Signup complete!")
+                        st.session_state.page = 'auth'
+                        st.rerun()
+                    else:
+                        st.error(f"Error: {signup_response.status_code}")
+                except Exception as e:
+                    st.error(f"Request failed: {e}")
 
     #if st.button("🔙 Back"):
         #st.session_state.page = "auth"
         #st.rerun()
 
 # Show content based on what was clicked
+
 elif st.session_state.page == "markets":
     st.title("Energy Markets Data Explorer")
     st.write("I have access to market protocols, energy and ancillary service prices, supply mix and actual load data for ERCOT, PJM, CAISO and NYISO markets. "
@@ -241,10 +289,31 @@ elif st.session_state.page == "batteries":
 
 elif st.session_state.page == "briefs":
     st.title("Market Trends and Briefs Generator")
-    st.write("Let me know what energy market topics or trends you'd like to keep an eye on and when and how frequently you'd like to get your briefs. "
-    "You'd need to subscribe to be able to do this.")
-    user_input = st.chat_input("Type your question here...")
-    if user_input:
-        st.write(f"🤖 You said: {user_input}")
+    topic = st.text_input("What energy market topics or trends do you want to track?", placeholder="e.g. Ancillary service prices in ERCOT and PJM")
+    options_freq = ["Monthly","Weekly", "Daily"]
+    options_day = ["Sunday", "Monday", "Tuesday","Wednesday","Thursday","Friday","Saturday"]
+    #custom_sources = st.text_input("Are there specific websites you'd like to check?", placeholder="e.g. utilitydive.com")
+    frequency = st.selectbox("How often do you want to get updates?", options_freq)
+    delivery_day = st.selectbox("What day would you prefer for monthly or weekly delivery?", options_day)
+    delivery_time = st.text_input("What delivery time do you prefer (e.g. 07:00 AM EST)?", placeholder="07:00 AM EST")
+
+    pattern = r"^(0[1-9]|1[0-2]):[0-5][0-9]\s?(AM|PM)\s?EST$"
+
+    if delivery_time:
+        if re.fullmatch(pattern, delivery_time .strip().upper()):
+            pass
+            #st.success(f"Valid time input: {user_input}")
+        else:
+            st.error("Invalid format. Please use HH:MM AM/PM EST (e.g., 07:00 AM EST)")
+
+    st.write("")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.button("**Preview custom brief**")
+    with col2:
+        st.button("**Update custom brief**")
+    with col3:
+        st.button("**Delete custom brief**")
+    
 
 
