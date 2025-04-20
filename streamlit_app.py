@@ -10,7 +10,6 @@ import json
 
 
 # Backend API URL
-#API_URL = "https://5132-2600-8806-350b-a700-c012-7c81-8638-e198.ngrok-free.app"
 signup_url = "https://5132-2600-8806-350b-a700-c012-7c81-8638-e198.ngrok-free.app/api/auth/signup"
 login_url = "https://5132-2600-8806-350b-a700-c012-7c81-8638-e198.ngrok-free.app/api/auth/login"
 checkout_url = "https://5132-2600-8806-350b-a700-c012-7c81-8638-e198.ngrok-free.app/api/payment/create-checkout-session"
@@ -170,8 +169,6 @@ elif st.session_state.page == "auth":
                 login_response = requests.post(login_url, json=payload, headers=headers_login)
 
                 if login_response.status_code == 200:
-                    #import pdb
-                    #pdb.set_trace()
                     st.session_state.access_token = login_response['access_token']
                     st.session_state.session_token = login_response['session_token']
                     profile_response = requests.get(profile_url, headers = headers)
